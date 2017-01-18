@@ -68,6 +68,25 @@ file.</p>
 <p>This will create a files called <a class="reference download internal" href="_downloads/output.dot.pdf" download=""><code class="xref download docutils literal"><span class="pre">output.dot.pdf</span></code></a>
 in the current directory.</p>
 </div>
+<div class="section" id="running-idf-plotter-the-hard-way">
+<h2>Running idf-plotter the hard way<a class="headerlink" href="#running-idf-plotter-the-hard-way" title="Permalink to this headline">¶</a></h2>
+<p>Check the contents of the <code class="docutils literal"><span class="pre">findreferences.bat</span></code> file:</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="n">findreferences</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">i</span> <span class="o">%</span><span class="mi">1</span> <span class="o">&gt;</span> <span class="n">names</span><span class="o">.</span><span class="n">txt</span>
+<span class="n">python</span> <span class="n">findreferences</span><span class="o">.</span><span class="n">py</span> <span class="o">-</span><span class="n">i</span> <span class="o">%</span><span class="mi">1</span> <span class="o">-</span><span class="n">n</span> <span class="n">names</span><span class="o">.</span><span class="n">txt</span> <span class="o">&gt;</span> <span class="n">output</span><span class="o">.</span><span class="n">dot</span>
+<span class="n">dot</span> <span class="o">-</span><span class="n">Tpdf</span> <span class="o">-</span><span class="n">O</span> <span class="o">-</span><span class="n">v</span> <span class="o">-</span><span class="n">Gsize</span><span class="o">=</span><span class="s2">&quot;10,15!&quot;</span> <span class="o">-</span><span class="n">Gratio</span><span class="o">=</span><span class="mf">0.6</span> <span class="o">-</span><span class="n">Nfontname</span><span class="o">=</span><span class="n">Arial</span> <span class="o">-</span><span class="n">Nfontsize</span><span class="o">=</span><span class="mi">12</span> <span class="o">-</span><span class="n">Nshape</span><span class="o">=</span><span class="n">box</span> <span class="o">-</span><span class="n">Ktwopi</span> <span class="o">-</span><span class="n">Goverlap</span><span class="o">=</span><span class="n">prism100</span> <span class="n">output</span><span class="o">.</span><span class="n">dot</span>
+<span class="n">start</span> <span class="n">output</span><span class="o">.</span><span class="n">dot</span><span class="o">.</span><span class="n">pdf</span>
+</pre></div>
+</div>
+<p>As you can see, <code class="docutils literal"><span class="pre">findreferences.bat</span></code> calls <code class="docutils literal"><span class="pre">findreferences.py</span></code>. Twice. Once without the <code class="docutils literal"><span class="pre">--names</span></code> argument and
+once with. These two calls work slightly different:</p>
+<ul class="simple">
+<li>if <code class="docutils literal"><span class="pre">--names</span></code> is present, this references a text file containing the list of names to output. Each line of this
+text file represents an object in the IDF file on a line. The objects are expected to be of the form <code class="docutils literal"><span class="pre">CLASS;ID</span></code>
+and the output contains only the <code class="docutils literal"><span class="pre">ID</span></code> portion. You can pass an edited version of the names text file, e.g. to filter
+out unwanted objects. The output of calling <code class="docutils literal"><span class="pre">findreferences.py</span></code> with a <code class="docutils literal"><span class="pre">--names</span></code> argument is the DOT graph.</li>
+<li>if <code class="docutils literal"><span class="pre">-names</span></code> is not present, the output is a names text file that can be used in a subsequent call, see above.</li>
+</ul>
+</div>
 </div>
 
 
@@ -81,6 +100,7 @@ in the current directory.</p>
 <li><a class="reference internal" href="#">Getting started with idf-plotter</a><ul>
 <li><a class="reference internal" href="#prerequisites">Prerequisites</a></li>
 <li><a class="reference internal" href="#running-idf-plotter-the-easy-way">Running idf-plotter the easy way</a></li>
+<li><a class="reference internal" href="#running-idf-plotter-the-hard-way">Running idf-plotter the hard way</a></li>
 </ul>
 </li>
 </ul>

@@ -38,3 +38,21 @@ Example:
 
 This will create a files called :download:`output.dot.pdf <output.dot.pdf>`
 in the current directory.
+
+
+Running idf-plotter the hard way
+--------------------------------
+
+Check the contents of the ``findreferences.bat`` file:
+
+.. literalinclude:: ../findreferences.bat
+
+As you can see, ``findreferences.bat`` calls ``findreferences.py``. Twice. Once without the ``--names`` argument and
+once with. These two calls work slightly different:
+
+- if ``--names`` is present, this references a text file containing the list of names to output. Each line of this
+  text file represents an object in the IDF file on a line. The objects are expected to be of the form ``CLASS;ID``
+  and the output contains only the ``ID`` portion. You can pass an edited version of the names text file, e.g. to filter
+  out unwanted objects. The output of calling ``findreferences.py`` with a ``--names`` argument is the DOT graph.
+
+- if ``-names`` is not present, the output is a names text file that can be used in a subsequent call, see above.

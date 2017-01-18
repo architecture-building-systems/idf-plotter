@@ -11,6 +11,7 @@ Welcome to idf-plotter's documentation!
    :caption: Contents:
 
    getting_started
+   modules
 
 
 

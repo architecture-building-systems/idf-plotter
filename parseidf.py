@@ -1,4 +1,4 @@
-'''
+"""
 parseidf.py
 
 parses an idf file into a dictionary of lists in the following manner:
@@ -13,7 +13,9 @@ parses an idf file into a dictionary of lists in the following manner:
       [B] => [ [B, 1, 2], [B, 1, 2, 3] }
 
     also, all field values are strings, i.e. no interpretation of the values is made.
-'''
+
+.. note:: Use eppy instead!
+"""
 import ply.lex as lex
 import ply.yacc as yacc
 

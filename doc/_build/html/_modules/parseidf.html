@@ -1,0 +1,192 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>parseidf &#8212; idf-plotter 1.0 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '1.0',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for parseidf</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">parseidf.py</span>
+
+<span class="sd">parses an idf file into a dictionary of lists in the following manner:</span>
+
+<span class="sd">    each idf object is represented by a list of its fields, with the first field</span>
+<span class="sd">    being the objects type.</span>
+
+<span class="sd">    each such list is appended to a list of objects with the same type in the</span>
+<span class="sd">    dictionary, indexed by type:</span>
+
+<span class="sd">    { [A] =&gt; [ [A, x, y, z], [A, a, b, c],</span>
+<span class="sd">      [B] =&gt; [ [B, 1, 2], [B, 1, 2, 3] }</span>
+
+<span class="sd">    also, all field values are strings, i.e. no interpretation of the values is made.</span>
+
+<span class="sd">.. note:: Use eppy instead!</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span> <span class="nn">ply.lex</span> <span class="k">as</span> <span class="nn">lex</span>
+<span class="kn">import</span> <span class="nn">ply.yacc</span> <span class="k">as</span> <span class="nn">yacc</span>
+
+<span class="c1"># list of token names</span>
+<span class="n">tokens</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s1">&#39;VALUE&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;COMMA&#39;</span><span class="p">,</span>
+        <span class="s1">&#39;SEMICOLON&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># regular expression rules for simple tokens</span>
+<span class="n">t_COMMA</span> <span class="o">=</span> <span class="s1">r&#39;[ \t]*,[ \t]*&#39;</span>
+<span class="n">t_SEMICOLON</span> <span class="o">=</span> <span class="s1">r&#39;[ \t]*;[ \t]*&#39;</span>
+
+<span class="c1"># ignore comments, tracking line numbers at the same time</span>
+<div class="viewcode-block" id="t_COMMENT"><a class="viewcode-back" href="../parseidf.html#parseidf.t_COMMENT">[docs]</a><span class="k">def</span> <span class="nf">t_COMMENT</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+    <span class="s1">r&#39;[ \t\r\n]*!.*&#39;</span>
+    <span class="n">newlines</span> <span class="o">=</span> <span class="p">[</span><span class="n">n</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">value</span> <span class="k">if</span> <span class="n">n</span> <span class="o">==</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">]</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">lineno</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">newlines</span><span class="p">)</span>
+    <span class="k">pass</span></div>
+    <span class="c1"># No return value. Token discarded</span>
+
+<span class="c1"># Define a rule so we can track line numbers</span>
+<div class="viewcode-block" id="t_newline"><a class="viewcode-back" href="../parseidf.html#parseidf.t_newline">[docs]</a><span class="k">def</span> <span class="nf">t_newline</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+    <span class="s1">r&#39;[ \t]*(\r?\n)+&#39;</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">lexer</span><span class="o">.</span><span class="n">lineno</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="t_VALUE"><a class="viewcode-back" href="../parseidf.html#parseidf.t_VALUE">[docs]</a><span class="k">def</span> <span class="nf">t_VALUE</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+    <span class="s1">r&#39;[ \t]*([^!,;\n]|[*])+[ \t]*&#39;</span>
+    <span class="k">return</span> <span class="n">t</span></div>
+
+<span class="c1"># Error handling rule</span>
+<div class="viewcode-block" id="t_error"><a class="viewcode-back" href="../parseidf.html#parseidf.t_error">[docs]</a><span class="k">def</span> <span class="nf">t_error</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="s2">&quot;Illegal character &#39;</span><span class="si">%s</span><span class="s2">&#39; at line </span><span class="si">%d</span><span class="s2"> of input&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">t</span><span class="o">.</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">t</span><span class="o">.</span><span class="n">lexer</span><span class="o">.</span><span class="n">lineno</span><span class="p">))</span>
+    <span class="n">t</span><span class="o">.</span><span class="n">lexer</span><span class="o">.</span><span class="n">skip</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span></div>
+
+<span class="c1"># define grammar of idf objects</span>
+<div class="viewcode-block" id="p_idffile"><a class="viewcode-back" href="../parseidf.html#parseidf.p_idffile">[docs]</a><span class="k">def</span> <span class="nf">p_idffile</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;idffile : idfobjectlist&#39;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">idfobject</span> <span class="ow">in</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">idfobject</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">result</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">name</span><span class="o">.</span><span class="n">upper</span><span class="p">(),</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">idfobject</span><span class="p">)</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">result</span></div>
+
+<div class="viewcode-block" id="p_idfobjectlist"><a class="viewcode-back" href="../parseidf.html#parseidf.p_idfobjectlist">[docs]</a><span class="k">def</span> <span class="nf">p_idfobjectlist</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;idfobjectlist : idfobject&#39;</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span></div>
+
+<div class="viewcode-block" id="p_idfobjectlist_multiple"><a class="viewcode-back" href="../parseidf.html#parseidf.p_idfobjectlist_multiple">[docs]</a><span class="k">def</span> <span class="nf">p_idfobjectlist_multiple</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;idfobjectlist : idfobject idfobjectlist&#39;</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">+</span> <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="p_idfobject"><a class="viewcode-back" href="../parseidf.html#parseidf.p_idfobject">[docs]</a><span class="k">def</span> <span class="nf">p_idfobject</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;idfobject : objectname SEMICOLON&#39;</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span></div>
+
+<div class="viewcode-block" id="p_idfobject_with_values"><a class="viewcode-back" href="../parseidf.html#parseidf.p_idfobject_with_values">[docs]</a><span class="k">def</span> <span class="nf">p_idfobject_with_values</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;idfobject : objectname COMMA valuelist SEMICOLON&#39;</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]]</span> <span class="o">+</span> <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="p_objectname"><a class="viewcode-back" href="../parseidf.html#parseidf.p_objectname">[docs]</a><span class="k">def</span> <span class="nf">p_objectname</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;objectname : VALUE&#39;</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span></div>
+
+<div class="viewcode-block" id="p_valuelist"><a class="viewcode-back" href="../parseidf.html#parseidf.p_valuelist">[docs]</a><span class="k">def</span> <span class="nf">p_valuelist</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;valuelist : VALUE&#39;</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span></div>
+
+<div class="viewcode-block" id="p_valuelist_multiple"><a class="viewcode-back" href="../parseidf.html#parseidf.p_valuelist_multiple">[docs]</a><span class="k">def</span> <span class="nf">p_valuelist_multiple</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="s1">&#39;valuelist : VALUE COMMA valuelist&#39;</span>
+    <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span> <span class="o">+</span> <span class="n">p</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span></div>
+
+<span class="c1"># oh, and handle errors</span>
+<div class="viewcode-block" id="p_error"><a class="viewcode-back" href="../parseidf.html#parseidf.p_error">[docs]</a><span class="k">def</span> <span class="nf">p_error</span><span class="p">(</span><span class="n">p</span><span class="p">):</span>
+    <span class="k">raise</span> <span class="ne">SyntaxError</span><span class="p">(</span><span class="s2">&quot;Syntax error in input on line </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">lex</span><span class="o">.</span><span class="n">lexer</span><span class="o">.</span><span class="n">lineno</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="parse"><a class="viewcode-back" href="../parseidf.html#parseidf.parse">[docs]</a><span class="k">def</span> <span class="nf">parse</span><span class="p">(</span><span class="nb">input</span><span class="p">):</span>
+    <span class="sd">&#39;&#39;&#39;</span>
+<span class="sd">    parses a string with the contents of the idf file and returns the dictionary</span>
+<span class="sd">    representation.</span>
+<span class="sd">    &#39;&#39;&#39;</span>
+    <span class="n">lexer</span> <span class="o">=</span> <span class="n">lex</span><span class="o">.</span><span class="n">lex</span><span class="p">(</span><span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">lexer</span><span class="o">.</span><span class="n">input</span><span class="p">(</span><span class="nb">input</span><span class="p">)</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">yacc</span><span class="o">.</span><span class="n">yacc</span><span class="p">()</span>
+    <span class="n">result</span> <span class="o">=</span>  <span class="n">parser</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>    
+    <span class="k">return</span> <span class="n">result</span></div>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2017, Daren Thomas.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
